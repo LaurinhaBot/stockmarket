@@ -1,0 +1,89 @@
+version: '3.8'
+
+services:
+  # Database Container
+  database:
+    image: postgres:15-alpine
+    container_name: bovespa-database
+    environment:
+      POSTGRES_USER: ${DB_USER:-bovespa}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-bovespa_secret}
+      POSTGRES_DB: ${DB_NAME:-bovespa_db}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/migrations:/docker-entrypoint-initdb.d
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    networks:
+      - bovespa-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-bovespa} -d ${DB_NAME:-bovespa_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Backend Container
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: bovespa-backend
+    environment:
+      NODE_ENV: development
+      PORT: 3001
+      DB_HOST: database
+      DB_PORT: 5432
+      DB_USER: ${DB_USER:-bovespa}
+      DB_PASSWORD: ${DB_PASSWORD:-bovespa_secret}
+      DB_NAME: ${DB_NAME:-bovespa_db}
+      JWT_SECRET: ${JWT_SECRET:-bovespa_jwt_secret}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-1h}
+    ports:
+      - "${BACKEND_PORT:-3001}:3001"
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+    depends_on:
+      database:
+        condition: service_healthy
+    networks:
+      - bovespa-network
+    restart: unless-stopped
+
+  # Frontend Container
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: bovespa-frontend
+    environment:
+      NODE_ENV: development
+      VITE_API_URL: http://backend:3001
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+    networks:
+      - bovespa-network
+    restart: unless-stopped
+
+networks:
+  bovespa-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+
+# Environment variables (use .env file for values)
+# To customize, create a .env file:
+# DB_USER=bovespa
+# DB_PASSWORD=your_secret_password
+# DB_NAME=bovespa_db
+# DB_PORT=5432
+# BACKEND_PORT=3001
+# FRONTEND_PORT=3000
+# JWT_SECRET=your_jwt_secret_key
+# JWT_EXPIRES_IN=1h

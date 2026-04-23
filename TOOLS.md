@@ -13,6 +13,12 @@ Things like:
 - Device nicknames
 - Anything environment-specific
 
+## GitHub Authentication (stockmarket repository)
+
+- Email: arthurceratti@hotmail.com
+- Username: laurinhbot
+- Status: Configured and push completed
+
 ## Examples
 
 ```markdown
